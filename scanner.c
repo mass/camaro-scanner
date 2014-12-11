@@ -1,4 +1,4 @@
-/*
+/**
  * @file scanner.c
  *
  * Program to scan the CAN bus of my car and output interesting data such as
@@ -9,32 +9,34 @@
 #include "scanner.h"
 
 // Integer representing the serial port used to talk to the ELM.
-int elmPort;
+int elm_port;
 
 // Boolean flag which, when set to 0, will terminate the pollRead thread.
-volatile unsigned char continueRead = 1;
+volatile unsigned char continue_read = 1;
 
 int main() {
-  // O_RDWR - Read/Write Mode.
-  // O_NOCITY - Tell the OS that we don't want to be the controlling terminal.
-  // O_NDELAY - Non-blocking open of the port.
-  elmPort = open(TTY, O_RDWR | O_NOCTTY | O_NDELAY);
+  /*
+   * O_RDWR - Read/Write Mode.
+   * O_NOCITY - Tell the OS that we don't want to be the controlling terminal.
+   * O_NDELAY - Non-blocking open of the port.
+   */
+  elm_port = open(TTY, O_RDWR | O_NOCTTY | O_NDELAY);
 
-  if(elmPort < 0) {
-    perror("1");
+  if (elm_port < 0) {
+    perror("Failed to open serial port");
     return 1;
   }
 
-  if(!isatty(elmPort)) {
-    perror("2");
+  if (!isatty(elm_port)) {
+    perror("Serial port not correct");
     return 2;
   }
 
   struct termios config;
 
   // Check to see if we can get current termios configuration.
-  if(tcgetattr(elmPort, &config) < 0) {
-    perror("3");
+  if (tcgetattr(elm_port, &config) < 0) {
+    perror("Failed to read serial port configuration");
     return 3;
   }
 
@@ -102,20 +104,20 @@ int main() {
   config.c_cc[VTIME] = 0;
 
   // Set the BAUD rate to 38400.
-  if(cfsetispeed(&config, B38400) < 0 || cfsetospeed(&config, B38400) < 0) {
-    perror("4");
+  if (cfsetispeed(&config, B38400) < 0 || cfsetospeed(&config, B38400) < 0) {
+    perror("Failed to set BAUD rate to 38400");
     return 4;
   }
 
   // Apply the configuration struct.
-  if(tcsetattr(elmPort, TCSAFLUSH, &config) < 0) {
-    perror("5");
+  if (tcsetattr(elm_port, TCSAFLUSH, &config) < 0) {
+    perror("Failed to apply new configuration to serial port");
     return 5;
   }
 
   // Make sure we can still retrieve the configuration.
-  if(tcgetattr(elmPort, &config) < 0) {
-    perror("6");
+  if (tcgetattr(elm_port, &config) < 0) {
+    perror("Failed to retrieve new serial port configuration");
     return 6;
   }
 
@@ -138,7 +140,7 @@ int main() {
   //TODO: Switch to proper SAE protocol. "AT SP 0"
   //TODO: Verify connection to car.
 
-  while(1) {
+  while (1) {
     writeElm(ELM_INFO);
     usleep(INTERVAL);
 
@@ -146,13 +148,14 @@ int main() {
     usleep(INTERVAL);
   }
 
-  continueRead = 0;
-  close(elmPort);
+  continue_read = 0;
+  pthread_join(readThread, NULL);
+  close(elm_port);
 }
 
 void writeElm(const char* command) {
-  ssize_t num = write(elmPort, command, strlen(command) + 1);
-  if(num < 0) {
+  ssize_t num = write(elm_port, command, strlen(command) + 1);
+  if (num < 0) {
     perror("Writing Failed!");
   } else {
     fprintf(stdout, "\nC: %s\n", command);
@@ -165,11 +168,11 @@ void* pollRead(void* ptr) {
   char* result = (char*) calloc(sizeof(char), 2);
   char* itr = buf;
 
-  while(continueRead) {
-    ssize_t num = read(elmPort, result, 1);
-    if(num > 0) {
-      if(result[0] != 0) {
-        if(result[0] == '>') {
+  while (continue_read) {
+    ssize_t num = read(elm_port, result, 1);
+    if (num > 0) {
+      if (result[0] != 0) {
+        if (result[0] == '>') {
           puts(buf);
           memset(buf, 0, sizeof(char) * READ_BUF_SIZE);
           itr = buf;

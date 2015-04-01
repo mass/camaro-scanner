@@ -14,13 +14,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <termios.h>
 #include <pthread.h>
 
 #define TTY "/dev/ttyUSB0"
 
-#define INTERVAL 300000
 #define READ_BUF_SIZE 16
 
 #define ELM_INFO "AT I\r"

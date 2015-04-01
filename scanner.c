@@ -14,6 +14,9 @@ int elm_port;
 // Boolean flag which, when set to 0, will terminate the pollRead thread.
 volatile unsigned char continue_read = 1;
 
+// Mutex lock used to wait for a response before sending more commands.
+pthread_mutex_t* read_lock;
+
 int main() {
   /*
    * O_RDWR - Read/Write Mode.
@@ -121,39 +124,41 @@ int main() {
     return 6;
   }
 
+  // Initialize read_lock mutex.
+  read_lock = calloc(1, sizeof(pthread_mutex_t));
+  pthread_mutex_init(read_lock, NULL);
+
   // Create a separate thread for reading from the port.
   pthread_t readThread;
   pthread_create(&readThread, NULL, pollRead, NULL);
 
   writeElm(ELM_RESET);
-  sleep(1);
-
   writeElm(ELM_DEFAULTS);
-  usleep(INTERVAL);
-
   writeElm(ELM_LINEFEED);
-  usleep(INTERVAL);
-
   writeElm(ELM_ECHO);
-  usleep(INTERVAL);
 
   //TODO: Switch to proper SAE protocol. "AT SP 0"
   //TODO: Verify connection to car.
 
-  while (1) {
-    writeElm(ELM_INFO);
-    usleep(INTERVAL);
+  writeElm(ELM_INFO);
+  writeElm(ELM_VOLTAGE);
 
-    writeElm(ELM_VOLTAGE);
-    usleep(INTERVAL);
-  }
+  // Ensure we have received the final response before terminating.
+  pthread_mutex_lock(read_lock);
 
   continue_read = 0;
   pthread_join(readThread, NULL);
   close(elm_port);
+
+  pthread_mutex_destroy(read_lock);
+  free(read_lock);
+  read_lock = NULL;
 }
 
 void writeElm(const char* command) {
+  // Only write if there is no pending read.
+  pthread_mutex_lock(read_lock);
+
   ssize_t num = write(elm_port, command, strlen(command) + 1);
   if (num < 0) {
     perror("Writing Failed!");
@@ -176,6 +181,9 @@ void* pollRead(void* ptr) {
           puts(buf);
           memset(buf, 0, sizeof(char) * READ_BUF_SIZE);
           itr = buf;
+
+          // Allow more writes.
+          pthread_mutex_unlock(read_lock);
         } else {
           //TODO: Protect against buffer overflow.
           *itr++ = result[0];

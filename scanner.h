@@ -19,14 +19,19 @@
 
 #define TTY "/dev/ttyUSB0"
 
-#define READ_BUF_SIZE 16
+#define READ_BUF_SIZE 32
 
-#define ELM_INFO "AT I\r"
-#define ELM_RESET "AT Z\r"
-#define ELM_LINEFEED "AT L1\r"
-#define ELM_ECHO "AT E0\r"
 #define ELM_DEFAULTS "AT D\r"
+#define ELM_DESCRIBE_PROTOCOL "AT DP\r"
+#define ELM_ECHO_OFF "AT E0\r"
+#define ELM_INFO "AT I\r"
+#define ELM_LINEFEED_ON "AT L1\r"
+#define ELM_RESET "AT Z\r"
 #define ELM_VOLTAGE "AT RV\r"
+
+#define COLOR_RED_BOLD "\033[1;31m"
+#define COLOR_BLUE_BOLD "\033[1;34m"
+#define COLOR_RESET "\033[0m"
 
 #define UNUSED(x) (void)(x)
 

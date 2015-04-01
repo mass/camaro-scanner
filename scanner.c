@@ -134,13 +134,14 @@ int main() {
 
   writeElm(ELM_RESET);
   writeElm(ELM_DEFAULTS);
-  writeElm(ELM_LINEFEED);
-  writeElm(ELM_ECHO);
+  writeElm(ELM_LINEFEED_ON);
+  writeElm(ELM_ECHO_OFF);
 
   //TODO: Switch to proper SAE protocol. "AT SP 0"
   //TODO: Verify connection to car.
 
   writeElm(ELM_INFO);
+  writeElm(ELM_DESCRIBE_PROTOCOL);
   writeElm(ELM_VOLTAGE);
 
   // Ensure we have received the final response before terminating.
@@ -163,7 +164,9 @@ void writeElm(const char* command) {
   if (num < 0) {
     perror("Writing Failed!");
   } else {
+    fprintf(stdout, "%s", COLOR_BLUE_BOLD);
     fprintf(stdout, "\nC: %s\n", command);
+    fprintf(stdout, "%s", COLOR_RESET);
   }
 }
 
@@ -172,21 +175,33 @@ void* pollRead(void* ptr) {
   char* buf = (char*) calloc(sizeof(char), READ_BUF_SIZE);
   char* result = (char*) calloc(sizeof(char), 2);
   char* itr = buf;
+  unsigned char buffer_overflow = 0;
 
   while (continue_read) {
     ssize_t num = read(elm_port, result, 1);
     if (num > 0) {
       if (result[0] != 0) {
         if (result[0] == '>') {
+          if(buffer_overflow) {
+            fprintf(stdout, "%s", COLOR_RED_BOLD);
+            puts("Error: Read buffer overflow");
+            fprintf(stdout, "%s", COLOR_RESET);
+          }
+
           puts(buf);
           memset(buf, 0, sizeof(char) * READ_BUF_SIZE);
           itr = buf;
+          buffer_overflow = 0;
 
           // Allow more writes.
           pthread_mutex_unlock(read_lock);
         } else {
-          //TODO: Protect against buffer overflow.
-          *itr++ = result[0];
+          // Only save into buffer if not at the end.
+          if(itr < buf + READ_BUF_SIZE) {
+            *itr++ = result[0];
+          } else {
+            buffer_overflow = 1;
+          }
         }
       }
     }
@@ -201,3 +216,4 @@ void* pollRead(void* ptr) {
 
   return NULL;
 }
+
